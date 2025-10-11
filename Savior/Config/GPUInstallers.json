@@ -1,0 +1,13 @@
+﻿{
+  "nvidia": {
+    "app_url": "",
+    "driver_url": "",
+    "silent_args": "/S",
+    "fallback_page": "https://www.nvidia.com/en-us/software/nvidia-app/"
+  },
+  "amd": {
+    "adrenalin_url": "",
+    "silent_args": "-install -quiet -norestart",
+    "fallback_page": "https://www.amd.com/en/support/download/drivers.html"
+  }
+}
