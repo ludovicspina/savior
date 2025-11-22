@@ -15,7 +15,9 @@ namespace Savior.Services
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                CreateNoWindow = true
+                CreateNoWindow = true,
+                StandardOutputEncoding = System.Text.Encoding.UTF8,
+                StandardErrorEncoding = System.Text.Encoding.UTF8
             };
             var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
             p.Start();

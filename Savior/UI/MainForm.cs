@@ -7,12 +7,20 @@ using System.Text;
 using Microsoft.Win32;
 using System.Runtime.InteropServices;
 
-
-
 namespace Savior.UI
 {
     public partial class MainForm : Form
     {
+        // Drag Window Logic
+        [DllImport("user32.dll")]
+        public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+        [DllImport("user32.dll")]
+        public static extern bool ReleaseCapture();
+
+        private Panel _customTitleBar;
+        private Label _customTitleLabel;
+        private Button _btnClose;
+        private Button _btnMinimize;
         private HardwareMonitorService _hardwareMonitor;
         private SystemInfoService _systemInfo;
 
@@ -81,6 +89,7 @@ namespace Savior.UI
             InitializeServices();
             RefreshTemperatures();
             LoadOptimizationLists();
+            ApplyTheme();
 
             var timer = new System.Windows.Forms.Timer { Interval = 500 };
             timer.Tick += (_, _) => RefreshTemperatures();
@@ -171,6 +180,136 @@ namespace Savior.UI
             });
         }
 
+        private void ApplyTheme()
+        {
+            Color darkBg = Color.FromArgb(45, 45, 48);
+            Color darkerBg = Color.FromArgb(30, 30, 30);
+            Color lightText = Color.White;
+            Color btnBg = Color.FromArgb(60, 60, 60);
+
+            // 1. Remove standard border
+            this.FormBorderStyle = FormBorderStyle.None;
+            this.Padding = new Padding(2); // Border effect
+            this.BackColor = darkBg;
+            this.ForeColor = lightText;
+
+            // 2. Create Custom Title Bar if not exists
+            if (_customTitleBar == null)
+            {
+                _customTitleBar = new Panel
+                {
+                    Dock = DockStyle.Top,
+                    Height = 32,
+                    BackColor = darkerBg
+                };
+                _customTitleBar.MouseDown += (s, e) => {
+                    if (e.Button == MouseButtons.Left)
+                    {
+                        ReleaseCapture();
+                        SendMessage(Handle, 0xA1, 0x2, 0);
+                    }
+                };
+
+                _btnClose = new Button
+                {
+                    Text = "✕",
+                    ForeColor = Color.White,
+                    BackColor = Color.Transparent,
+                    FlatStyle = FlatStyle.Flat,
+                    Dock = DockStyle.Right,
+                    Width = 40,
+                    Cursor = Cursors.Hand
+                };
+                _btnClose.FlatAppearance.BorderSize = 0;
+                _btnClose.FlatAppearance.MouseOverBackColor = Color.Red;
+                _btnClose.Click += (s, e) => this.Close();
+
+                _btnMinimize = new Button
+                {
+                    Text = "—",
+                    ForeColor = Color.White,
+                    BackColor = Color.Transparent,
+                    FlatStyle = FlatStyle.Flat,
+                    Dock = DockStyle.Right,
+                    Width = 40,
+                    Cursor = Cursors.Hand
+                };
+                _btnMinimize.FlatAppearance.BorderSize = 0;
+                _btnMinimize.FlatAppearance.MouseOverBackColor = Color.FromArgb(80, 80, 80);
+                _btnMinimize.Click += (s, e) => this.WindowState = FormWindowState.Minimized;
+
+                _customTitleLabel = new Label
+                {
+                    Text = "Savior",
+                    ForeColor = Color.White,
+                    Font = new Font("Segoe UI", 10, FontStyle.Regular),
+                    AutoSize = true,
+                    Location = new Point(10, 6)
+                };
+
+                _customTitleBar.Controls.Add(_customTitleLabel);
+                _customTitleBar.Controls.Add(_btnMinimize);
+                _customTitleBar.Controls.Add(_btnClose);
+
+                this.Controls.Add(_customTitleBar);
+            }
+
+            // 3. Theme all controls
+            foreach (Control c in this.Controls)
+            {
+                ThemeControl(c, darkBg, darkerBg, lightText, btnBg);
+            }
+        }
+
+        private void ThemeControl(Control c, Color darkBg, Color darkerBg, Color text, Color btnBg)
+        {
+            if (c is Button btn)
+            {
+                btn.FlatStyle = FlatStyle.Flat;
+                btn.BackColor = btnBg;
+                btn.ForeColor = text;
+                btn.FlatAppearance.BorderSize = 0;
+            }
+            else if (c is Label lbl)
+            {
+                lbl.ForeColor = text;
+            }
+            else if (c is CheckBox cb)
+            {
+                cb.ForeColor = text;
+            }
+            else if (c is GroupBox gb)
+            {
+                gb.ForeColor = text;
+            }
+            else if (c is CheckedListBox clb)
+            {
+                clb.BackColor = darkerBg;
+                clb.ForeColor = text;
+                clb.BorderStyle = BorderStyle.None;
+            }
+            else if (c is TabControl tc)
+            {
+                foreach (TabPage page in tc.TabPages)
+                {
+                    page.BackColor = darkBg;
+                    page.ForeColor = text;
+                    foreach (Control child in page.Controls)
+                    {
+                        ThemeControl(child, darkBg, darkerBg, text, btnBg);
+                    }
+                }
+            }
+
+            if (c.HasChildren && !(c is TabControl))
+            {
+                foreach (Control child in c.Controls)
+                {
+                    ThemeControl(child, darkBg, darkerBg, text, btnBg);
+                }
+            }
+        }
+
         private void InitializeServices()
         {
             if (IsInDesignMode())
@@ -209,96 +348,43 @@ namespace Savior.UI
             }
         }
         
-        private async Task InstallEssentialAppsWithWingetAsync()
+        private async Task RunFullSetupAsync(List<string> wingetApps)
         {
             using var dlg = new Savior.UI.InstallProgressForm();
             dlg.Show(this);
 
             try
             {
+                // 1. Remove bloatwares
+                await RemoveBloatwaresAsync(dlg.Append, dlg.Token);
+
+                // 2. Disable services
+                await DisableUnwantedServicesAsync(dlg.Append, dlg.Token);
+
+                // 3. Winget installation
+                dlg.Append("--- Installation des applications (Winget) ---");
                 dlg.Append("Vérification / réparation de winget…");
                 await Savior.Services.WingetInstaller.EnsureWingetHealthyAsync(dlg.Append);
 
-                var ids = new List<string>
-                {
-                    "VideoLAN.VLC",
-                    "Google.Chrome",
-                    "Adobe.Acrobat.Reader.64-bit",
-                    "TheDocumentFoundation.LibreOffice"
-                };
-
-                dlg.SetSteps(ids.Count);
+                dlg.SetSteps(wingetApps.Count);
                 await Savior.Services.WingetInstaller.InstallSelectedWithProgressAsync(
-                    ids, dlg.Append, dlg.Step, dlg.Token
+                    wingetApps, dlg.Append, dlg.Step, dlg.Token
                 );
+
+                dlg.Append("--- Setup complet ! ---");
             }
             catch (Exception ex)
             {
                 dlg.Append("[ERROR] " + ex.Message);
-                MessageBox.Show(ex.Message, "Winget", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(ex.Message, "Setup", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         
-        private async Task InstallGamingAppsWithWingetAsync()
-        {
-            using var dlg = new Savior.UI.InstallProgressForm();
-            dlg.Show(this);
 
-            try
-            {
-                dlg.Append("Vérification / réparation de winget…");
-                await Savior.Services.WingetInstaller.EnsureWingetHealthyAsync(dlg.Append);
-
-                var ids = new List<string>
-                {
-                    "VideoLAN.VLC",
-                    "Google.Chrome",
-                    "Adobe.Acrobat.Reader.64-bit",
-                    "TheDocumentFoundation.LibreOffice",
-                    "Valve.Steam",
-                    "Discord.Discord"
-                };
-
-                dlg.SetSteps(ids.Count);
-                await Savior.Services.WingetInstaller.InstallSelectedWithProgressAsync(
-                    ids, dlg.Append, dlg.Step, dlg.Token
-                );
-            }
-            catch (Exception ex)
-            {
-                dlg.Append("[ERROR] " + ex.Message);
-                MessageBox.Show(ex.Message, "Winget", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
         
-        private async Task RemoveBloatwaresAsync()
+        private async Task RemoveBloatwaresAsync(Action<string> log, CancellationToken token)
         {
             var script = new StringBuilder();
-
-            // --- Préfixe PowerShell : positionner la console en haut à droite ---
-            script.AppendLine(@"
-try {
-    Add-Type -AssemblyName System.Windows.Forms
-
-    Add-Type @'
-using System;
-using System.Runtime.InteropServices;
-public static class Win32 {
-  [DllImport(""user32.dll"", SetLastError=true)]
-  public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
-}
-'@
-
-    $hwnd = (Get-Process -Id $pid).MainWindowHandle
-    if ($hwnd -ne [IntPtr]::Zero) {
-        $area = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-        $w = 600; $h = 300    # taille souhaitée
-        $x = $area.Right - $w # placé tout à droite
-        $y = $area.Top        # en haut
-        [Win32]::MoveWindow($hwnd, $x, $y, $w, $h, $true) | Out-Null
-    }
-} catch {}
-");
 
             // --- Corps : désinstallations sélectionnées ---
             foreach (var item in checkedListBoxApps.Items)
@@ -319,18 +405,31 @@ if ($package) {{
 
             if (script.Length > 0)
             {
-                script.AppendLine("Start-Sleep -Seconds 5");
-                script.AppendLine("exit");
+                log("--- Suppression des bloatwares ---");
+                string tempFile = Path.Combine(Path.GetTempPath(), $"RemoveBloat_{Guid.NewGuid()}.ps1");
+                File.WriteAllText(tempFile, script.ToString());
 
-                // Important : ta méthode RunPowerShellScript doit lancer une console visible
-                // (pas de -WindowStyle Hidden / -NoWindow).
-                RunPowerShellScript(script.ToString());
-                await Task.Delay(1000);
+                try
+                {
+                    await ProcessRunner.RunHiddenAsync(
+                        "powershell.exe",
+                        $"-NoProfile -ExecutionPolicy Bypass -File \"{tempFile}\"",
+                        log
+                    );
+                }
+                finally
+                {
+                    if (File.Exists(tempFile)) File.Delete(tempFile);
+                }
+            }
+            else
+            {
+                log("Aucun bloatware sélectionné.");
             }
         }
 
 
-        private async Task DisableUnwantedServicesAsync()
+        private async Task DisableUnwantedServicesAsync(Action<string> log, CancellationToken token)
         {
             var selectedServices = new List<string>();
 
@@ -344,24 +443,27 @@ if ($package) {{
 
             if (selectedServices.Any())
             {
+                log("--- Désactivation des services ---");
                 string scriptPath =
                     Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scripts", "DisableServices.ps1");
 
                 if (!File.Exists(scriptPath))
-                    throw new FileNotFoundException("Script DisableServices.ps1 introuvable.");
-
-                string joinedServices = string.Join(",", selectedServices.Select(s => s.Replace("'", "''")));
-
-                var psi = new ProcessStartInfo
                 {
-                    FileName = "powershell.exe",
-                    Arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" -Services \"{joinedServices}\"",
-                    UseShellExecute = true,
-                    Verb = "runas"
-                };
+                    log("[ERROR] Script DisableServices.ps1 introuvable.");
+                    return;
+                }
 
-                Process.Start(psi);
-                await Task.Delay(1000);
+                string joinedServices = string.Join(",", selectedServices.Select(s => s.Replace("'", "''"));
+
+                await ProcessRunner.RunHiddenAsync(
+                    "powershell.exe",
+                    $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" -Services \"{joinedServices}\"",
+                    log
+                );
+            }
+            else
+            {
+                log("Aucun service sélectionné.");
             }
         }
 
@@ -583,10 +685,7 @@ if ($package) {{
                 // OpenSettingsUri("ms-settings:windowsupdate"); // Ouverture de windows update
                 // await ActivateWindowsIfNeededAsync(); // Ouverture de MAS si besoin d'activer windows
                 // await GpuInstaller.InstallForDetectedGpuAsync(msg => Console.WriteLine(msg)); // Installation des GPU si besoin
-                await RemoveBloatwaresAsync(); // Bloatware removal
-                await DisableUnwantedServicesAsync(); // Services removal 
-                // await InstallEssentialAppsWithWingetAsync(); // Installation des app de base
-
+                await RunFullSetupAsync(AppProfiles.Multimedia); // All-in-one setup
                 
                 
 
@@ -607,10 +706,7 @@ if ($package) {{
                 OpenSettingsUri("ms-settings:windowsupdate"); // Ouverture de windows update
                 await ActivateWindowsIfNeededAsync(); // Ouverture de MAS si besoin d'activer windows
                 // await GpuInstaller.InstallForDetectedGpuAsync(msg => Console.WriteLine(msg)); // Installation des GPU si besoin
-                await RemoveBloatwaresAsync(); // Bloatware removal
-                await DisableUnwantedServicesAsync(); // Services removal 
-                await InstallGamingAppsWithWingetAsync(); // Installation des app de base
-
+                await RunFullSetupAsync(AppProfiles.Gaming); // All-in-one setup
                 
                 
 
@@ -913,7 +1009,6 @@ if ($package) {{
             }
         }
 
-
         /// <summary>
         /// Required method for Designer support - do not modify
         /// the contents of this method with the code editor.
@@ -921,7 +1016,7 @@ if ($package) {{
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
-            AllTabs = new System.Windows.Forms.TabControl();
+            AllTabs = new Savior.UI.DarkTabControl();
             TabGeneral = new System.Windows.Forms.TabPage();
             buttonMaj = new System.Windows.Forms.Button();
             groupBox11 = new System.Windows.Forms.GroupBox();
@@ -966,10 +1061,12 @@ if ($package) {{
             groupBox6 = new System.Windows.Forms.GroupBox();
             checkedListBoxApps = new System.Windows.Forms.CheckedListBox();
             buttonBloatWare = new System.Windows.Forms.Button();
+            tabVirus = new System.Windows.Forms.TabPage();
             labelCpuTemp = new System.Windows.Forms.Label();
             labelGpuTemp = new System.Windows.Forms.Label();
             labelWindowsActivation = new System.Windows.Forms.Label();
             _buttonActivation = new System.Windows.Forms.Button();
+            // Removed previously added controls (btnVirusClean, txtVirusLog) to restore original state
             AllTabs.SuspendLayout();
             TabGeneral.SuspendLayout();
             groupBox11.SuspendLayout();
@@ -982,6 +1079,7 @@ if ($package) {{
             tabOptimisation.SuspendLayout();
             groupBox7.SuspendLayout();
             groupBox6.SuspendLayout();
+            tabVirus.SuspendLayout();
             SuspendLayout();
             // 
             // AllTabs
@@ -990,6 +1088,7 @@ if ($package) {{
             AllTabs.Controls.Add(TabGeneral);
             AllTabs.Controls.Add(TabSoftwares);
             AllTabs.Controls.Add(tabOptimisation);
+            AllTabs.Controls.Add(tabVirus);
             AllTabs.Dock = System.Windows.Forms.DockStyle.Top;
             AllTabs.Location = new System.Drawing.Point(0, 0);
             AllTabs.Name = "AllTabs";
@@ -999,6 +1098,10 @@ if ($package) {{
             // 
             // TabGeneral
             // 
+            TabGeneral.Controls.Add(labelCpuTemp);
+            TabGeneral.Controls.Add(labelGpuTemp);
+            TabGeneral.Controls.Add(labelWindowsActivation);
+            TabGeneral.Controls.Add(_buttonActivation);
             TabGeneral.Controls.Add(buttonMaj);
             TabGeneral.Controls.Add(groupBox11);
             TabGeneral.Controls.Add(groupBox5);
@@ -1453,10 +1556,20 @@ if ($package) {{
             buttonBloatWare.UseVisualStyleBackColor = true;
             buttonBloatWare.Click += BtnUninstallSelectedApps_Click;
             // 
+            // tabVirus
+            // 
+            tabVirus.Location = new System.Drawing.Point(4, 28);
+            tabVirus.Name = "tabVirus";
+            tabVirus.Padding = new System.Windows.Forms.Padding(3);
+            tabVirus.Size = new System.Drawing.Size(889, 576);
+            tabVirus.TabIndex = 4;
+            tabVirus.Text = "Virus";
+            tabVirus.UseVisualStyleBackColor = true;
+            // 
             // labelCpuTemp
             // 
             labelCpuTemp.AccessibleName = "labelCpuTemp";
-            labelCpuTemp.Location = new System.Drawing.Point(16, 611);
+            labelCpuTemp.Location = new System.Drawing.Point(16, 510);
             labelCpuTemp.Name = "labelCpuTemp";
             labelCpuTemp.Size = new System.Drawing.Size(100, 16);
             labelCpuTemp.TabIndex = 1;
@@ -1465,7 +1578,7 @@ if ($package) {{
             // labelGpuTemp
             // 
             labelGpuTemp.AccessibleName = "labelGpuTemp";
-            labelGpuTemp.Location = new System.Drawing.Point(16, 627);
+            labelGpuTemp.Location = new System.Drawing.Point(16, 530);
             labelGpuTemp.Name = "labelGpuTemp";
             labelGpuTemp.Size = new System.Drawing.Size(100, 16);
             labelGpuTemp.TabIndex = 2;
@@ -1473,7 +1586,7 @@ if ($package) {{
             // 
             // labelWindowsActivation
             // 
-            labelWindowsActivation.Location = new System.Drawing.Point(107, 613);
+            labelWindowsActivation.Location = new System.Drawing.Point(130, 510);
             labelWindowsActivation.Name = "labelWindowsActivation";
             labelWindowsActivation.Size = new System.Drawing.Size(176, 32);
             labelWindowsActivation.TabIndex = 0;
@@ -1482,9 +1595,9 @@ if ($package) {{
             // 
             // _buttonActivation
             // 
-            _buttonActivation.Location = new System.Drawing.Point(255, 611);
+            _buttonActivation.Location = new System.Drawing.Point(130, 540);
             _buttonActivation.Name = "_buttonActivation";
-            _buttonActivation.Size = new System.Drawing.Size(179, 34);
+            _buttonActivation.Size = new System.Drawing.Size(120, 30);
             _buttonActivation.TabIndex = 5;
             _buttonActivation.Text = "Activer";
             _buttonActivation.UseVisualStyleBackColor = true;
@@ -1493,10 +1606,6 @@ if ($package) {{
             // MainForm
             // 
             ClientSize = new System.Drawing.Size(897, 649);
-            Controls.Add(_buttonActivation);
-            Controls.Add(labelWindowsActivation);
-            Controls.Add(labelGpuTemp);
-            Controls.Add(labelCpuTemp);
             Controls.Add(AllTabs);
             FormBorderStyle = System.Windows.Forms.FormBorderStyle.Fixed3D;
             Icon = ((System.Drawing.Icon)resources.GetObject("$this.Icon"));
@@ -1516,8 +1625,13 @@ if ($package) {{
             tabOptimisation.ResumeLayout(false);
             groupBox7.ResumeLayout(false);
             groupBox6.ResumeLayout(false);
+            tabVirus.ResumeLayout(false);
             ResumeLayout(false);
         }
+
+        private System.Windows.Forms.TabPage tabVirus;
+
+        // NOTE: removed previously added fields btnVirusClean and txtVirusLog to restore original file state
 
         private System.Windows.Forms.Button buttonGamingInstallGeneral;
         private System.Windows.Forms.Button NvidiaInstall;
@@ -1531,7 +1645,7 @@ if ($package) {{
         private System.Windows.Forms.Button buttonBasicInstallGeneral;
         private GroupBox groupBox6;
         private GroupBox groupBox7;
-        private TabPage tabOptimisation;
+        private System.Windows.Forms.TabPage tabOptimisation;
         private System.Windows.Forms.GroupBox groupBox5;
         private System.Windows.Forms.GroupBox groupBox3;
         private System.Windows.Forms.GroupBox groupBox4;
@@ -1541,10 +1655,7 @@ if ($package) {{
         private System.Windows.Forms.TabControl AllTabs;
         private System.Windows.Forms.TabPage TabGeneral;
         private TabPage TabSoftwares;
-
-        private void buttonGamingInstallGeneral_Click(object sender, EventArgs e)
-        {
-            throw new System.NotImplementedException();
-        }
+        
     }
 }
+

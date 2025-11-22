@@ -1,6 +1,8 @@
-﻿// File: Services/WingetInstaller.cs
-
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,47 +13,29 @@ namespace Savior.Services
     {
         public static async Task EnsureWingetHealthyAsync(Action<string>? log = null)
         {
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory; // dossier de Savior.exe
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string bundlePath = Path.Combine(baseDir, "Data", "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle");
-
-            // 0) si winget marche déjà, ne touche à rien
-            // if (await WingetOkAsync())
-            // {
-            //     log?.Invoke("winget OK");
-            //     return;
-            // }
 
             if (!File.Exists(bundlePath))
                 throw new FileNotFoundException("App Installer .msixbundle introuvable", bundlePath);
 
             log?.Invoke("Réparation App Installer (msixbundle)...");
-            // 1) repair/upgrade in-place
-            RunAdminPS($"""
-                            Add-AppxPackage -Path '{bundlePath}' -ForceApplicationShutdown -ForceUpdateFromAnyVersion
-                        """);
+            
+            // 1) repair/upgrade in-place via PowerShell hidden
+            await ProcessRunner.RunHiddenAsync("powershell.exe", 
+                $"-NoProfile -ExecutionPolicy Bypass -Command \"Add-AppxPackage -Path '{bundlePath}' -ForceApplicationShutdown -ForceUpdateFromAnyVersion\"",
+                s => CleanLog(s, log));
 
             // 2) sources
             log?.Invoke("Reset/update des sources winget...");
-            RunAdminPS("winget source reset --force; winget source update");
+            await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => CleanLog(s, log));
+            await ProcessRunner.RunHiddenAsync("winget", "source update", s => CleanLog(s, log));
 
             // 3) recheck
             if (!await WingetOkAsync())
                 throw new InvalidOperationException("winget reste indisponible après réparation");
 
             log?.Invoke("winget opérationnel.");
-        }
-
-        private static void RunAdminPS(string command)
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"{command}\"",
-                UseShellExecute = true,
-                Verb = "runas"
-            };
-            using var p = Process.Start(psi);
-            p?.WaitForExit();
         }
 
         private static async Task<bool> WingetOkAsync()
@@ -78,7 +62,7 @@ namespace Savior.Services
             }
         }
 
-        // ========= BOOTSTRAP =========
+        // ========= BOOTSTRAP (Legacy / Fallback) =========
         private static string BuildBootstrapScript()
         {
             return @"
@@ -130,8 +114,7 @@ try { winget source reset --force; winget source update } catch {
             });
         }
 
-        // ========= VERSION "CONSOLE VISIBLE" (comme avant) =========
-        // selection: logicalName -> checked ; ids map dans ce flux simple: logicalName == id si tu veux
+        // ========= VERSION "CONSOLE VISIBLE" (Legacy) =========
         public static async Task InstallSelectedAsync(Dictionary<string, bool> selection, Action<string>? log = null)
         {
             // 1) bootstrap
@@ -157,12 +140,10 @@ try { winget source reset --force; winget source update } catch {
             sb.AppendLine("  } else { Write-Host (\"{0} -> OK\" -f $id) }");
             sb.AppendLine("}");
 
-            // mapping simple logicalName -> id (ici on considère que logicalName == id si tu passes déjà des IDs)
             foreach (var kv in selection)
             {
                 if (kv.Value) // checked
                 {
-                    // si tu utilises un catalog JSON ailleurs, remplace kv.Key par l'ID réel
                     var id = kv.Key switch
                     {
                         "VLC" => "VideoLAN.VLC",
@@ -180,7 +161,7 @@ try { winget source reset --force; winget source update } catch {
                         "MyAsus" => "9N7R5S6B0ZZH",
                         "Bitdefender" => "Bitdefender.Bitdefender",
                         "Steam" => "Valve.Steam",
-                        _ => kv.Key // fallback: déjà un ID
+                        _ => kv.Key 
                     };
                     sb.AppendLine($"Install-AppId '{id}'");
                 }
@@ -198,35 +179,74 @@ try { winget source reset --force; winget source update } catch {
             CancellationToken token)
         {
             // reset/update sources silencieux
-            await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => log?.Invoke(s));
+            await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => CleanLog(s, log));
             if (token.IsCancellationRequested) return;
-            await ProcessRunner.RunHiddenAsync("winget", "source update", s => log?.Invoke(s));
+            await ProcessRunner.RunHiddenAsync("winget", "source update", s => CleanLog(s, log));
             if (token.IsCancellationRequested) return;
 
             foreach (var id in ids)
             {
                 if (token.IsCancellationRequested) break;
 
-                log?.Invoke($"--- Installing {id} ---");
+                CleanLog($"--- Installing {id} ---", log);
                 var args = $"install --id {id} -e --silent --accept-package-agreements --accept-source-agreements";
-                var code = await ProcessRunner.RunHiddenAsync("winget", args, s => log?.Invoke(s));
-                if (code != 0 && !token.IsCancellationRequested)
+                var code = await ProcessRunner.RunHiddenAsync("winget", args, s => CleanLog(s, log));
+
+                // Check for specific exit codes
+                // 0 = Success
+                // -1978335189 (0x8A15002B) = No update available (already installed)
+                if (code == 0)
                 {
-                    log?.Invoke($"[WARN] {id} -> échec (code {code}). Reset sources + retry…");
-                    await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => log?.Invoke(s));
-                    await ProcessRunner.RunHiddenAsync("winget", "source update", s => log?.Invoke(s));
-                    code = await ProcessRunner.RunHiddenAsync("winget", args, s => log?.Invoke(s));
-                    if (code != 0) log?.Invoke($"[ERROR] {id} -> échec final (code {code})");
-                    else log?.Invoke($"{id} -> OK après retry");
+                    CleanLog($"{id} -> OK", log);
                 }
-                else
+                else if (code == -1978335189)
                 {
-                    log?.Invoke($"{id} -> OK");
+                    CleanLog($"{id} -> Déjà à jour (ou plus récent).", log);
+                }
+                else if (!token.IsCancellationRequested)
+                {
+                    CleanLog($"[WARN] {id} -> échec (code {code}). Reset sources + retry…", log);
+                    await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => CleanLog(s, log));
+                    await ProcessRunner.RunHiddenAsync("winget", "source update", s => CleanLog(s, log));
+                    code = await ProcessRunner.RunHiddenAsync("winget", args, s => CleanLog(s, log));
+                    
+                    if (code == 0) CleanLog($"{id} -> OK après retry", log);
+                    else if (code == -1978335189) CleanLog($"{id} -> Déjà à jour après retry.", log);
+                    else CleanLog($"[ERROR] {id} -> échec final (code {code})", log);
                 }
 
                 step?.Invoke();
             }
         }
+
+        private static void CleanLog(string? line, Action<string>? log)
+        {
+            if (string.IsNullOrWhiteSpace(line)) return;
+            
+            // Filter common noise
+            if (line.Contains("nécessite des privilèges d'administrateur")) return;
+            if (line.Contains("privilèges d'administrateur")) return;
+            if (line.Contains("Mise à jour en cours de toutes les sources")) return;
+            if (line.Contains("Terminé")) return; // Often redundant
+            
+            // Filter progress bars
+            if (line.Contains("█") || line.Contains("▒")) return;
+            if (line.Trim() == "-") return;
+            if (line.Trim() == "\\") return;
+            if (line.Trim() == "|") return;
+            if (line.Trim() == "/") return;
+            if (line.Trim().All(c => c == '-' || c == ' ')) return; // Progress bars like "   -   "
+            
+            // Simplify "Mise à jour..."
+            if (line.Contains("Mise à jour de la source"))
+            {
+                 var parts = line.Split(':');
+                 if (parts.Length > 1) log?.Invoke($"Update source: {parts[1].Trim()}");
+                 else log?.Invoke(line.Trim());
+                 return;
+            }
+
+            log?.Invoke(line.Trim());
+        }
     }
-    
 }
