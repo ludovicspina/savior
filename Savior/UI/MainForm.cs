@@ -72,6 +72,9 @@ namespace Savior.UI
 
         private ToolStripStatusLabel toolStripStatusLabelWindows;
 
+        private CheckedListBox checkedListBoxCleanupTools;
+        private Button btnCleanup;
+
         public MainForm()
         {
             InitializeComponent();
@@ -489,6 +492,84 @@ if ($package) {{
             Process.Start(psi);
         }
 
+        private async Task RunCleanupAsync(List<CleanupTool> selectedTools, Action<string> log, CancellationToken token)
+        {
+            log("=== Démarrage du nettoyage ===");
+            
+            foreach (var tool in selectedTools)
+            {
+                if (token.IsCancellationRequested)
+                {
+                    log("[WARN] Nettoyage annulé par l'utilisateur");
+                    break;
+                }
+
+                log($"--- {tool.Name} ---");
+                log(tool.Description);
+
+                try
+                {
+                    // Check if it's a PowerShell script (multiline or contains PowerShell cmdlets)
+                    bool isPowerShell = tool.Command.Contains("\n") || 
+                                       tool.Command.Contains("Remove-Item") ||
+                                       tool.Command.Contains("Get-") ||
+                                       tool.Command.Contains("Clear-RecycleBin") ||
+                                       tool.Command.Contains("Optimize-Volume");
+
+                    if (isPowerShell)
+                    {
+                        // Execute as PowerShell script
+                        string tempFile = Path.Combine(Path.GetTempPath(), $"Cleanup_{Guid.NewGuid()}.ps1");
+                        File.WriteAllText(tempFile, tool.Command);
+
+                        try
+                        {
+                            await ProcessRunner.RunHiddenAsync(
+                                "powershell.exe",
+                                $"-NoProfile -ExecutionPolicy Bypass -File \"{tempFile}\"",
+                                log
+                            );
+                        }
+                        finally
+                        {
+                            if (File.Exists(tempFile)) File.Delete(tempFile);
+                        }
+                    }
+                    else
+                    {
+                        // Execute as direct command
+                        var parts = tool.Command.Split(' ', 2);
+                        string exe = parts[0];
+                        string args = parts.Length > 1 ? parts[1] : "";
+
+                        await ProcessRunner.RunHiddenAsync(exe, args, log);
+                    }
+
+                    log($"✓ {tool.Name} terminé");
+                }
+                catch (Exception ex)
+                {
+                    log($"[ERROR] {tool.Name} a échoué : {ex.Message}");
+                }
+
+                log(""); // Empty line for separation
+            }
+
+            log("=== Nettoyage terminé ===");
+        }
+
+        private void LoadCleanupTools()
+        {
+            checkedListBoxCleanupTools.Items.Clear();
+            
+            foreach (var tool in CleanupTools.All)
+            {
+                // Pre-check basic cleanup tools
+                bool isChecked = tool.Category == CleanupCategory.Basic;
+                checkedListBoxCleanupTools.Items.Add(tool.Name, isChecked);
+            }
+        }
+
         private void LoadOptimizationLists()
         {
             // Pour les applications
@@ -520,6 +601,64 @@ if ($package) {{
                     _ => false
                 };
                 checkedListBoxServices.Items.Add(service, isChecked);
+            }
+
+            // Load cleanup tools
+            LoadCleanupTools();
+        }
+
+        private async void BtnCleanup_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Get selected tools
+                var selectedToolNames = new List<string>();
+                foreach (var item in checkedListBoxCleanupTools.CheckedItems)
+                {
+                    selectedToolNames.Add(item.ToString());
+                }
+
+                if (!selectedToolNames.Any())
+                {
+                    MessageBox.Show("Veuillez sélectionner au moins un outil de nettoyage.", "Nettoyage", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Find the corresponding CleanupTool objects
+                var selectedTools = CleanupTools.All
+                    .Where(t => selectedToolNames.Contains(t.Name))
+                    .ToList();
+
+                // Check if any heavy operations are selected
+                bool hasHeavyOps = selectedTools.Any(t => 
+                    t.Name.Contains("SFC") || 
+                    t.Name.Contains("DISM") || 
+                    t.Name.Contains("Windows Update Cleanup"));
+
+                if (hasHeavyOps)
+                {
+                    var result = MessageBox.Show(
+                        "⚠️ Vous avez sélectionné des opérations lourdes (SFC, DISM) qui peuvent prendre 15-30 minutes.\n\n" +
+                        "Voulez-vous continuer ?",
+                        "Avertissement",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+
+                    if (result != DialogResult.Yes)
+                        return;
+                }
+
+                // Run cleanup in progress window
+                using var dlg = new Savior.UI.InstallProgressForm();
+                dlg.Show(this);
+
+                await RunCleanupAsync(selectedTools, dlg.Append, dlg.Token);
+
+                MessageBox.Show("✅ Nettoyage terminé !", "Nettoyage", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"❌ Erreur lors du nettoyage : {ex.Message}", "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -1062,6 +1201,8 @@ if ($package) {{
             checkedListBoxApps = new System.Windows.Forms.CheckedListBox();
             buttonBloatWare = new System.Windows.Forms.Button();
             tabVirus = new System.Windows.Forms.TabPage();
+            checkedListBoxCleanupTools = new System.Windows.Forms.CheckedListBox();
+            btnCleanup = new System.Windows.Forms.Button();
             labelCpuTemp = new System.Windows.Forms.Label();
             labelGpuTemp = new System.Windows.Forms.Label();
             labelWindowsActivation = new System.Windows.Forms.Label();
@@ -1558,6 +1699,8 @@ if ($package) {{
             // 
             // tabVirus
             // 
+            tabVirus.Controls.Add(btnCleanup);
+            tabVirus.Controls.Add(checkedListBoxCleanupTools);
             tabVirus.Location = new System.Drawing.Point(4, 28);
             tabVirus.Name = "tabVirus";
             tabVirus.Padding = new System.Windows.Forms.Padding(3);
@@ -1565,6 +1708,24 @@ if ($package) {{
             tabVirus.TabIndex = 4;
             tabVirus.Text = "Virus";
             tabVirus.UseVisualStyleBackColor = true;
+            // 
+            // checkedListBoxCleanupTools
+            // 
+            checkedListBoxCleanupTools.FormattingEnabled = true;
+            checkedListBoxCleanupTools.Location = new System.Drawing.Point(20, 60);
+            checkedListBoxCleanupTools.Name = "checkedListBoxCleanupTools";
+            checkedListBoxCleanupTools.Size = new System.Drawing.Size(850, 480);
+            checkedListBoxCleanupTools.TabIndex = 1;
+            // 
+            // btnCleanup
+            // 
+            btnCleanup.Location = new System.Drawing.Point(350, 20);
+            btnCleanup.Name = "btnCleanup";
+            btnCleanup.Size = new System.Drawing.Size(200, 30);
+            btnCleanup.TabIndex = 0;
+            btnCleanup.Text = "🧹 Nettoyer";
+            btnCleanup.UseVisualStyleBackColor = true;
+            btnCleanup.Click += BtnCleanup_Click;
             // 
             // labelCpuTemp
             // 
