@@ -70,6 +70,14 @@ Les profils d'applications (Multimédia, Gaming) sont définis dans `Savior/Cons
 *   `Savior/Data` : Ressources statiques (Icônes, Installateurs).
 
 ### Fonctionnalités Récentes
+*   **v1.2.0** (2025-11-27)
+    *   **Nouveaux Outils de Sécurité** : Ajout de Windows Defender (Scan Complet), AdwCleaner (Mode Manuel) et Réinitialisation des Navigateurs (Chrome, Edge, Firefox).
+    *   **Logs Détaillés** : Génération d'un rapport complet sur le bureau après chaque nettoyage (`Rapport_Nettoyage_Savior_DATE.txt`).
+    *   **Amélioration UI** : Sélection des outils par simple clic (plus besoin de viser la case à cocher).
+    *   **Restauration Icônes** : Réactivation de l'affichage des icônes système (Ce PC, Corbeille, etc.) dans le setup multimédia.
+    *   **Nettoyage Navigateurs Amélioré** : Suppression des extensions, vidage du cache et désactivation des notifications intrusives.
+    *   **Suppression CCleaner** : Retrait de l'outil pour privilégier des solutions plus légères et intégrées.
+
 *   **v1.1.0** (2025-11-22)
     *   Implémentation du thème sombre complet avec composants personnalisés
     *   Unification du workflow d'installation (Bloatware → Services → Winget)
