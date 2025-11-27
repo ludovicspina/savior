@@ -456,7 +456,7 @@ if ($package) {{
                     return;
                 }
 
-                string joinedServices = string.Join(",", selectedServices.Select(s => s.Replace("'", "''"));
+                string joinedServices = string.Join(",", selectedServices.Select(s => s.Replace("'", "''")));
 
                 await ProcessRunner.RunHiddenAsync(
                     "powershell.exe",
