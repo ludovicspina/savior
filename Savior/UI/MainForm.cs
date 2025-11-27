@@ -516,7 +516,35 @@ if ($package) {{
                                        tool.Command.Contains("Clear-RecycleBin") ||
                                        tool.Command.Contains("Optimize-Volume");
 
-                    if (isPowerShell)
+                    if (tool.Command == "DOWNLOAD_ADWCLEANER")
+                    {
+                        // Special handling for AdwCleaner download
+                        try
+                        {
+                            string adwPath = await Services.ToolDownloader.DownloadAdwCleanerAsync(log);
+                            log("🚀 Lancement d'AdwCleaner...");
+                            
+                            var psi = new ProcessStartInfo
+                            {
+                                FileName = adwPath,
+                                Arguments = "/eula", // Just accept EULA, let user scan/clean manually
+                                UseShellExecute = true,
+                                Verb = "runas" // Requires admin
+                            };
+                            
+                            var process = Process.Start(psi);
+                            if (process != null)
+                            {
+                                await process.WaitForExitAsync();
+                                log("✓ AdwCleaner terminé");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            log($"[ERROR] AdwCleaner a échoué : {ex.Message}");
+                        }
+                    }
+                    else if (isPowerShell)
                     {
                         // Execute as PowerShell script
                         string tempFile = Path.Combine(Path.GetTempPath(), $"Cleanup_{Guid.NewGuid()}.ps1");
@@ -560,6 +588,7 @@ if ($package) {{
 
         private void LoadCleanupTools()
         {
+            checkedListBoxCleanupTools.CheckOnClick = true; // Enable single click selection
             checkedListBoxCleanupTools.Items.Clear();
             
             foreach (var tool in CleanupTools.All)
@@ -652,7 +681,40 @@ if ($package) {{
                 using var dlg = new Savior.UI.InstallProgressForm();
                 dlg.Show(this);
 
-                await RunCleanupAsync(selectedTools, dlg.Append, dlg.Token);
+                // Prepare log capture
+                var fullLog = new StringBuilder();
+                fullLog.AppendLine($"=== Rapport de Nettoyage Savior ===");
+                fullLog.AppendLine($"Date : {DateTime.Now}");
+                fullLog.AppendLine("--------------------------------------------------");
+                fullLog.AppendLine();
+
+                Action<string> logWrapper = (msg) =>
+                {
+                    dlg.Append(msg);
+                    fullLog.AppendLine(msg);
+                };
+
+                await RunCleanupAsync(selectedTools, logWrapper, dlg.Token);
+
+                // Save log to Desktop
+                try
+                {
+                    string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    string logFileName = $"Rapport_Nettoyage_Savior_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+                    string logPath = Path.Combine(desktopPath, logFileName);
+                    
+                    fullLog.AppendLine();
+                    fullLog.AppendLine("--------------------------------------------------");
+                    fullLog.AppendLine("Fin du rapport.");
+                    
+                    await File.WriteAllTextAsync(logPath, fullLog.ToString());
+                    
+                    logWrapper($"📝 Rapport sauvegardé sur le bureau : {logFileName}");
+                }
+                catch (Exception ex)
+                {
+                    logWrapper($"[WARN] Impossible de sauvegarder le rapport : {ex.Message}");
+                }
 
                 MessageBox.Show("✅ Nettoyage terminé !", "Nettoyage", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -819,7 +881,7 @@ if ($package) {{
         {
             try
             {
-                // await CreateShortcutsAsync(); // Création des raccourcis bureau
+                await CreateShortcutsAsync(); // Création des raccourcis bureau
                 // await EnsureWingetInstalledAsync(); // MAJ Winget obligatoire pour éviter les confits
                 // OpenSettingsUri("ms-settings:windowsupdate"); // Ouverture de windows update
                 // await ActivateWindowsIfNeededAsync(); // Ouverture de MAS si besoin d'activer windows
