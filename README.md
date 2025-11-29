@@ -70,6 +70,13 @@ Les profils d'applications (Multimédia, Gaming) sont définis dans `Savior/Cons
 *   `Savior/Data` : Ressources statiques (Icônes, Installateurs).
 
 ### Fonctionnalités Récentes
+*   **v1.3.0** (2025-11-29)
+    *   **Installation Automatique de Winget** : Téléchargement automatique de winget depuis GitHub si le fichier local n'existe pas (compatible Windows 10 fraîche).
+    *   **Fenêtre d'Installation Unifiée** : Les trois modes d'installation (Multimédia, Gaming, Personnalisée) utilisent désormais la même fenêtre moderne `InstallProgressForm`.
+    *   **Activation Windows Indépendante** : Le script MAS s'ouvre dans sa propre fenêtre uniquement si Windows n'est pas activé.
+    *   **Installation Personnalisée Améliorée** : Utilise maintenant la fenêtre unifiée avec téléchargement automatique de winget et logs en temps réel.
+    *   **Logs Améliorés** : Messages plus clairs avec emojis (✅, ⚠️, 📥, 🔄) pour une meilleure lisibilité.
+
 *   **v1.2.0** (2025-11-27)
     *   **Nouveaux Outils de Sécurité** : Ajout de Windows Defender (Scan Complet), AdwCleaner (Mode Manuel) et Réinitialisation des Navigateurs (Chrome, Edge, Firefox).
     *   **Logs Détaillés** : Génération d'un rapport complet sur le bureau après chaque nettoyage (`Rapport_Nettoyage_Savior_DATE.txt`).

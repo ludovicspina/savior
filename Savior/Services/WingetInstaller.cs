@@ -13,13 +13,41 @@ namespace Savior.Services
     {
         public static async Task EnsureWingetHealthyAsync(Action<string>? log = null)
         {
+            // First, check if winget is already working
+            if (await WingetOkAsync())
+            {
+                log?.Invoke("✓ winget est déjà opérationnel.");
+                return;
+            }
+
+            log?.Invoke("⚠️ winget n'est pas opérationnel, tentative de réparation...");
+
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             string bundlePath = Path.Combine(baseDir, "Data", "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle");
 
+            // Check if local bundle exists, if not download it
             if (!File.Exists(bundlePath))
-                throw new FileNotFoundException("App Installer .msixbundle introuvable", bundlePath);
+            {
+                log?.Invoke("⚠️ Fichier .msixbundle local introuvable.");
+                
+                try
+                {
+                    // Download latest version from GitHub
+                    bundlePath = await ToolDownloader.DownloadWingetAsync(s => log?.Invoke(s));
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Impossible de télécharger winget depuis GitHub: {ex.Message}. " +
+                        "Vérifiez votre connexion internet.", ex);
+                }
+            }
+            else
+            {
+                log?.Invoke($"✓ Fichier .msixbundle trouvé: {Path.GetFileName(bundlePath)}");
+            }
 
-            log?.Invoke("Réparation App Installer (msixbundle)...");
+            log?.Invoke("⚙️ Installation/Réparation App Installer (msixbundle)...");
             
             // 1) repair/upgrade in-place via PowerShell hidden
             await ProcessRunner.RunHiddenAsync("powershell.exe", 
@@ -27,7 +55,7 @@ namespace Savior.Services
                 s => CleanLog(s, log));
 
             // 2) sources
-            log?.Invoke("Reset/update des sources winget...");
+            log?.Invoke("🔄 Reset/update des sources winget...");
             await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => CleanLog(s, log));
             await ProcessRunner.RunHiddenAsync("winget", "source update", s => CleanLog(s, log));
 
@@ -35,7 +63,7 @@ namespace Savior.Services
             if (!await WingetOkAsync())
                 throw new InvalidOperationException("winget reste indisponible après réparation");
 
-            log?.Invoke("winget opérationnel.");
+            log?.Invoke("✅ winget opérationnel.");
         }
 
         private static async Task<bool> WingetOkAsync()

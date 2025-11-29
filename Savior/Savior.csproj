@@ -8,7 +8,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <LangVersion>12.0</LangVersion>
         <ApplicationIcon>Data\savior.ico</ApplicationIcon>
-       <!--  <ApplicationManifest>app.manifest</ApplicationManifest> -->
+        <ApplicationManifest>app.manifest</ApplicationManifest>
     </PropertyGroup>
 
     <ItemGroup>

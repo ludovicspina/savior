@@ -884,7 +884,7 @@ if ($package) {{
                 await CreateShortcutsAsync(); // Création des raccourcis bureau
                 // await EnsureWingetInstalledAsync(); // MAJ Winget obligatoire pour éviter les confits
                 // OpenSettingsUri("ms-settings:windowsupdate"); // Ouverture de windows update
-                // await ActivateWindowsIfNeededAsync(); // Ouverture de MAS si besoin d'activer windows
+                await ActivateWindowsIfNeededAsync(); // Ouverture de MAS si besoin d'activer windows
                 // await GpuInstaller.InstallForDetectedGpuAsync(msg => Console.WriteLine(msg)); // Installation des GPU si besoin
                 await RunFullSetupAsync(AppProfiles.Multimedia); // All-in-one setup
                 
@@ -903,19 +903,19 @@ if ($package) {{
             try
             {
                 await CreateShortcutsAsync(); // Création des raccourcis bureau
-                await EnsureWingetInstalledAsync(); // MAJ Winget obligatoire pour éviter les confits
-                OpenSettingsUri("ms-settings:windowsupdate"); // Ouverture de windows update
+                // await EnsureWingetInstalledAsync(); // MAJ Winget obligatoire pour éviter les confits
+                // OpenSettingsUri("ms-settings:windowsupdate"); // Ouverture de windows update
                 await ActivateWindowsIfNeededAsync(); // Ouverture de MAS si besoin d'activer windows
                 // await GpuInstaller.InstallForDetectedGpuAsync(msg => Console.WriteLine(msg)); // Installation des GPU si besoin
                 await RunFullSetupAsync(AppProfiles.Gaming); // All-in-one setup
                 
                 
 
-                // MessageBox.Show("Setup multimédia terminé ✅");
+                // MessageBox.Show("Setup gaming terminé ✅");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Erreur dans le setup multimédia : {ex.Message}");
+                MessageBox.Show($"Erreur dans le setup gaming : {ex.Message}");
             }
         }
 
@@ -1034,30 +1034,61 @@ if ($service) {{
         {
             try
             {
-                var selection = new Dictionary<string, bool>
-                {
-                    ["VLC"] = checkBoxVLC?.Checked == true,
-                    ["7ZIP"] = checkBox7ZIP?.Checked == true,
-                    ["Chrome"] = checkBoxChrome?.Checked == true,
-                    ["Adobe"] = checkBoxAdobe?.Checked == true,
-                    ["SublimeText"] = checkBoxSublimeText?.Checked == true,
-                    ["LibreOffice"] = checkBoxLibreOffice?.Checked == true,
-                    ["Bitdefender"] = checkBoxBitdefender?.Checked == true,
-                    ["Steam"] = checkBoxSteam?.Checked == true,
-                    ["Discord"] = checkBoxDiscord?.Checked == true,
-                    ["Teams"] = checkBoxTeams?.Checked == true,
-                    ["TreeSize"] = checkBoxTreeSize?.Checked == true,
-                    ["HDDS"] = checkBoxHDDS?.Checked == true,
-                    ["LenovoVantage"] = checkBoxLenovoVantage?.Checked == true,
-                    ["HpSmart"] = checkBoxHpSmart?.Checked == true,
-                    ["MyAsus"] = checkBoxMyAsus?.Checked == true
-                };
+                // Build list of selected app IDs
+                var selectedIds = new List<string>();
 
-                // Exception : Kaspersky reste un lien web
+                if (checkBoxVLC?.Checked == true) selectedIds.Add("VideoLAN.VLC");
+                if (checkBox7ZIP?.Checked == true) selectedIds.Add("7zip.7zip");
+                if (checkBoxChrome?.Checked == true) selectedIds.Add("Google.Chrome");
+                if (checkBoxAdobe?.Checked == true) selectedIds.Add("Adobe.Acrobat.Reader.64-bit");
+                if (checkBoxSublimeText?.Checked == true) selectedIds.Add("Sublime.SublimeText.4");
+                if (checkBoxLibreOffice?.Checked == true) selectedIds.Add("TheDocumentFoundation.LibreOffice");
+                if (checkBoxBitdefender?.Checked == true) selectedIds.Add("Bitdefender.Bitdefender");
+                if (checkBoxSteam?.Checked == true) selectedIds.Add("Valve.Steam");
+                if (checkBoxDiscord?.Checked == true) selectedIds.Add("Discord.Discord");
+                if (checkBoxTeams?.Checked == true) selectedIds.Add("Microsoft.Teams");
+                if (checkBoxTreeSize?.Checked == true) selectedIds.Add("JAMSoftware.TreeSize");
+                if (checkBoxHDDS?.Checked == true) selectedIds.Add("JanosMathe.HardDiskSentinel");
+                if (checkBoxLenovoVantage?.Checked == true) selectedIds.Add("9WZDNCRFJ4MV");
+                if (checkBoxHpSmart?.Checked == true) selectedIds.Add("9WZDNCRFHWLH");
+                if (checkBoxMyAsus?.Checked == true) selectedIds.Add("9N7R5S6B0ZZH");
+
+                // Exception: Kaspersky opens web link
                 if (checkBoxKaspersky?.Checked == true)
                     Process.Start(new ProcessStartInfo { FileName = "https://www.kaspersky.fr/downloads/standard", UseShellExecute = true });
 
-                await Savior.Services.WingetInstaller.InstallSelectedAsync(selection, msg => Console.WriteLine(msg));
+                if (selectedIds.Count == 0)
+                {
+                    MessageBox.Show("Veuillez sélectionner au moins une application à installer.", "Installation personnalisée", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Use the unified installation window (same as multimedia/gaming setups)
+                using var dlg = new Savior.UI.InstallProgressForm();
+                dlg.Show(this);
+
+                try
+                {
+                    // Activate Windows if needed (MAS opens independently)
+                    await ActivateWindowsIfNeededAsync();
+
+                    // Winget installation & setup
+                    dlg.Append("--- Installation personnalisée ---");
+                    dlg.Append("Vérification / réparation de winget…");
+                    await Savior.Services.WingetInstaller.EnsureWingetHealthyAsync(dlg.Append);
+
+                    dlg.SetSteps(selectedIds.Count);
+                    await Savior.Services.WingetInstaller.InstallSelectedWithProgressAsync(
+                        selectedIds, dlg.Append, dlg.Step, dlg.Token
+                    );
+
+                    dlg.Append("--- Installation personnalisée terminée ! ---");
+                }
+                catch (Exception ex)
+                {
+                    dlg.Append("[ERROR] " + ex.Message);
+                    MessageBox.Show(ex.Message, "Installation personnalisée", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
             catch (Exception ex)
             {
