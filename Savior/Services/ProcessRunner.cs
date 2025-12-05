@@ -6,12 +6,13 @@ namespace Savior.Services
 {
     public static class ProcessRunner
     {
-        public static async Task<int> RunHiddenAsync(string file, string args, Action<string>? onLine = null)
+        public static async Task<int> RunHiddenAsync(string file, string args, Action<string>? onLine = null, string? workingDirectory = null)
         {
             var psi = new ProcessStartInfo
             {
                 FileName = file,
                 Arguments = args,
+                WorkingDirectory = workingDirectory ?? AppDomain.CurrentDomain.BaseDirectory,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,

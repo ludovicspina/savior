@@ -109,5 +109,51 @@ namespace Savior.Services
             }
             return "Inconnu";
         }
+
+        public string GetManufacturer()
+        {
+            var searcher = new ManagementObjectSearcher("select * from Win32_ComputerSystem");
+            foreach (var item in searcher.Get())
+            {
+                string manufacturer = item["Manufacturer"]?.ToString()?.ToUpper() ?? "";
+                
+                // Normaliser les noms de fabricants
+                if (manufacturer.Contains("LENOVO")) return "LENOVO";
+                if (manufacturer.Contains("ASUS")) return "ASUS";
+                if (manufacturer.Contains("ACER")) return "ACER";
+                if (manufacturer.Contains("HP") || manufacturer.Contains("HEWLETT")) return "HP";
+                if (manufacturer.Contains("DELL")) return "DELL";
+                if (manufacturer.Contains("MSI") || manufacturer.Contains("MICRO-STAR")) return "MSI";
+                if (manufacturer.Contains("GIGABYTE") || manufacturer.Contains("AORUS")) return "GIGABYTE";
+                
+                return manufacturer;
+            }
+            return "UNKNOWN";
+        }
+
+        public bool IsLaptop()
+        {
+            try
+            {
+                var searcher = new ManagementObjectSearcher("select * from Win32_SystemEnclosure");
+                foreach (var item in searcher.Get())
+                {
+                    var chassisTypes = (UInt16[])item["ChassisTypes"];
+                    if (chassisTypes != null && chassisTypes.Length > 0)
+                    {
+                        // Chassis types for laptops: 8, 9, 10, 11, 12, 14, 18, 21, 30, 31
+                        int type = chassisTypes[0];
+                        return type == 8 || type == 9 || type == 10 || type == 11 || 
+                               type == 12 || type == 14 || type == 18 || type == 21 || 
+                               type == 30 || type == 31;
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback: assume desktop if detection fails
+            }
+            return false;
+        }
     }
 }

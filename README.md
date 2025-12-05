@@ -70,6 +70,18 @@ Les profils d'applications (Multimédia, Gaming) sont définis dans `Savior/Cons
 *   `Savior/Data` : Ressources statiques (Icônes, Installateurs).
 
 ### Fonctionnalités Récentes
+*   **v1.4.0** (2025-12-05)
+    *   **Outils Anti-Malware Portables** : Ajout de 5 outils professionnels de diagnostic et nettoyage :
+        *   **RKill** : Neutralise les processus malveillants actifs
+        *   **AdwCleaner** : Suppression d'adware et PUP (déjà présent, optimisé)
+        *   **Autoruns** (Microsoft Sysinternals) : Analyse complète des démarrages Windows
+        *   **FRST** (Farbar Recovery Scan Tool) : Diagnostic système avec logs détaillés
+        *   **HijackThis** : Détection des détournements de navigateur
+    *   **Script de Téléchargement Automatique** : `Download-SecurityTools.ps1` télécharge automatiquement RKill, AdwCleaner et Autoruns
+    *   **Stockage Local** : Outils portables stockés dans `Tools/` (~18 MB total) et copiés automatiquement lors du build/publish
+    *   **Configuration Par Défaut** : 10 outils pré-sélectionnés pour un nettoyage complet (Fichiers temp, Cache DNS, Windows Update Cleanup, Defender, etc.)
+    *   **Documentation Intégrée** : `Tools/README.txt` avec instructions de téléchargement manuel pour FRST et HijackThis
+
 *   **v1.3.0** (2025-11-29)
     *   **Installation Automatique de Winget** : Téléchargement automatique de winget depuis GitHub si le fichier local n'existe pas (compatible Windows 10 fraîche).
     *   **Fenêtre d'Installation Unifiée** : Les trois modes d'installation (Multimédia, Gaming, Personnalisée) utilisent désormais la même fenêtre moderne `InstallProgressForm`.

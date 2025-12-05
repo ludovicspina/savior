@@ -85,6 +85,22 @@ namespace Savior.Constants
                 "Télécharge et lance AdwCleaner (vous devrez lancer le scan et nettoyer manuellement)",
                 "DOWNLOAD_ADWCLEANER"), // Special command handled by RunCleanupAsync
 
+            new CleanupTool("RKill - Tuer Processus Malveillants", CleanupCategory.SecurityScan,
+                "⚠️ ATTENTION: Fermera Savior! À exécuter MANUELLEMENT depuis Tools/rkill.exe AVANT de lancer les autres scans",
+                "LOCAL_TOOL:rkill.exe"),
+
+            new CleanupTool("Autoruns - Analyse Démarrage", CleanupCategory.SecurityScan,
+                "Outil Microsoft Sysinternals - Liste tout ce qui démarre avec Windows (très puissant)",
+                "LOCAL_TOOL:Autoruns64.exe"),
+
+            new CleanupTool("FRST - Diagnostic Système", CleanupCategory.SecurityScan,
+                "Farbar Recovery Scan Tool - Génère des logs détaillés pour diagnostic approfondi",
+                "LOCAL_TOOL:FRST64.exe"),
+
+            new CleanupTool("HijackThis - Détection Détournement", CleanupCategory.SecurityScan,
+                "Analyse les points d'entrée système pour détecter les détournements de navigateur",
+                "LOCAL_TOOL:HijackThis.exe"),
+
             new CleanupTool("Réinitialisation Navigateurs", CleanupCategory.SecurityScan,
                 "Réinitialise Chrome, Edge et Firefox (supprime extensions, cache, désactive notifications)",
                 @"

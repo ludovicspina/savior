@@ -55,9 +55,10 @@ namespace Savior.Services
                 s => CleanLog(s, log));
 
             // 2) sources
+            string sys32 = Environment.GetFolderPath(Environment.SpecialFolder.System);
             log?.Invoke("🔄 Reset/update des sources winget...");
-            await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => CleanLog(s, log));
-            await ProcessRunner.RunHiddenAsync("winget", "source update", s => CleanLog(s, log));
+            await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => CleanLog(s, log), sys32);
+            await ProcessRunner.RunHiddenAsync("winget", "source update", s => CleanLog(s, log), sys32);
 
             // 3) recheck
             if (!await WingetOkAsync())
@@ -206,10 +207,12 @@ try { winget source reset --force; winget source update } catch {
             Action? step,
             CancellationToken token)
         {
+            string sys32 = Environment.GetFolderPath(Environment.SpecialFolder.System);
+
             // reset/update sources silencieux
-            await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => CleanLog(s, log));
+            await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => CleanLog(s, log), sys32);
             if (token.IsCancellationRequested) return;
-            await ProcessRunner.RunHiddenAsync("winget", "source update", s => CleanLog(s, log));
+            await ProcessRunner.RunHiddenAsync("winget", "source update", s => CleanLog(s, log), sys32);
             if (token.IsCancellationRequested) return;
 
             foreach (var id in ids)
@@ -218,7 +221,7 @@ try { winget source reset --force; winget source update } catch {
 
                 CleanLog($"--- Installing {id} ---", log);
                 var args = $"install --id {id} -e --silent --accept-package-agreements --accept-source-agreements";
-                var code = await ProcessRunner.RunHiddenAsync("winget", args, s => CleanLog(s, log));
+                var code = await ProcessRunner.RunHiddenAsync("winget", args, s => CleanLog(s, log), sys32);
 
                 // Check for specific exit codes
                 // 0 = Success
@@ -234,9 +237,9 @@ try { winget source reset --force; winget source update } catch {
                 else if (!token.IsCancellationRequested)
                 {
                     CleanLog($"[WARN] {id} -> échec (code {code}). Reset sources + retry…", log);
-                    await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => CleanLog(s, log));
-                    await ProcessRunner.RunHiddenAsync("winget", "source update", s => CleanLog(s, log));
-                    code = await ProcessRunner.RunHiddenAsync("winget", args, s => CleanLog(s, log));
+                    await ProcessRunner.RunHiddenAsync("winget", "source reset --force", s => CleanLog(s, log), sys32);
+                    await ProcessRunner.RunHiddenAsync("winget", "source update", s => CleanLog(s, log), sys32);
+                    code = await ProcessRunner.RunHiddenAsync("winget", args, s => CleanLog(s, log), sys32);
                     
                     if (code == 0) CleanLog($"{id} -> OK après retry", log);
                     else if (code == -1978335189) CleanLog($"{id} -> Déjà à jour après retry.", log);

@@ -47,6 +47,29 @@ namespace Savior.Services
         }
 
         /// <summary>
+        /// Gets the absolute path to a local tool in the Scripts/Tools directory
+        /// </summary>
+        /// <param name="toolFileName">Name of the tool executable (e.g., "rkill.exe")</param>
+        /// <returns>Absolute path to the tool</returns>
+        /// <exception cref="FileNotFoundException">Thrown if the tool doesn't exist</exception>
+        public static string GetLocalToolPath(string toolFileName)
+        {
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string toolPath = Path.Combine(baseDir, "Tools", toolFileName);
+
+            if (!File.Exists(toolPath))
+            {
+                throw new FileNotFoundException(
+                    $"Outil '{toolFileName}' introuvable.\n\n" +
+                    $"Chemin attendu: {toolPath}\n\n" +
+                    $"💡 Exécutez le script 'Scripts\\Download-SecurityTools.ps1' pour télécharger tous les outils de sécurité."
+                );
+            }
+
+            return toolPath;
+        }
+
+        /// <summary>
         /// Downloads FRST (Farbar Recovery Scan Tool) - 64-bit version
         /// </summary>
         /// <param name="log">Action to log progress messages</param>

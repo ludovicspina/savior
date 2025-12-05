@@ -61,6 +61,9 @@ namespace Savior.UI
         private CheckBox checkBoxLenovoVantage;
         private CheckBox checkBoxMyAsus;
         private CheckBox checkBoxHpSmart;
+        private CheckBox checkBoxAcerSense;
+        private CheckBox checkBoxMsiCenter;
+        private CheckBox checkBoxGigabyteControlCenter;
 
         private System.Windows.Forms.Label labelManu;
 
@@ -89,10 +92,26 @@ namespace Savior.UI
             if (IsInDesignMode())
                 return;
 
+            // Appliquer le thème Fluent (Mica + Dark Mode)
+            ThemeManager.ApplyTheme(this);
+            this.Font = new Font("Segoe UI Variable Display", 9F, FontStyle.Regular, GraphicsUnit.Point);
+
             InitializeServices();
             RefreshTemperatures();
             LoadOptimizationLists();
-            ApplyTheme();
+            // ApplyTheme(); // Ancienne méthode supprimée
+
+            // Masquer la barre d'état (StatusStrip) si elle existe
+            foreach (Control c in this.Controls)
+            {
+                if (c is StatusStrip ss)
+                {
+                    ss.Visible = false;
+                }
+            }
+
+            // Configurer l'affichage des apps spécifiques au fabricant
+            ConfigureManufacturerSpecificApps();
 
             var timer = new System.Windows.Forms.Timer { Interval = 500 };
             timer.Tick += (_, _) => RefreshTemperatures();
@@ -321,6 +340,56 @@ namespace Savior.UI
             _hardwareMonitor = new HardwareMonitorService();
             _systemInfo = new SystemInfoService();
         }
+
+        private void ConfigureManufacturerSpecificApps()
+        {
+            if (IsInDesignMode())
+                return;
+
+            try
+            {
+                string manufacturer = _systemInfo.GetManufacturer();
+                bool isLaptop = _systemInfo.IsLaptop();
+
+                // Masquer toutes les checkboxes fabricants par défaut
+                if (checkBoxLenovoVantage != null) checkBoxLenovoVantage.Visible = false;
+                if (checkBoxMyAsus != null) checkBoxMyAsus.Visible = false;
+                if (checkBoxHpSmart != null) checkBoxHpSmart.Visible = false;
+                if (checkBoxAcerSense != null) checkBoxAcerSense.Visible = false;
+                if (checkBoxMsiCenter != null) checkBoxMsiCenter.Visible = false;
+                if (checkBoxGigabyteControlCenter != null) checkBoxGigabyteControlCenter.Visible = false;
+
+                // Afficher uniquement la checkbox correspondant au fabricant si c'est un portable
+                if (isLaptop)
+                {
+                    switch (manufacturer)
+                    {
+                        case "LENOVO":
+                            if (checkBoxLenovoVantage != null) checkBoxLenovoVantage.Visible = true;
+                            break;
+                        case "ASUS":
+                            if (checkBoxMyAsus != null) checkBoxMyAsus.Visible = true;
+                            break;
+                        case "HP":
+                            if (checkBoxHpSmart != null) checkBoxHpSmart.Visible = true;
+                            break;
+                        case "ACER":
+                            if (checkBoxAcerSense != null) checkBoxAcerSense.Visible = true;
+                            break;
+                        case "MSI":
+                            if (checkBoxMsiCenter != null) checkBoxMsiCenter.Visible = true;
+                            break;
+                        case "GIGABYTE":
+                            if (checkBoxGigabyteControlCenter != null) checkBoxGigabyteControlCenter.Visible = true;
+                            break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur ConfigureManufacturerSpecificApps: {ex.Message}");
+            }
+        }
         
         private Task CreateShortcutsAsync()
         {
@@ -332,22 +401,26 @@ namespace Savior.UI
         {
             if (!_windowsActivationStatus.Contains("Actif"))
             {
-                string masPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scripts", "MAS_AIO.cmd");
-                if (!File.Exists(masPath))
+                try
                 {
-                    MessageBox.Show("MAS_AIO.cmd non trouvé.");
-                    return;
+                    // Utiliser le script en ligne depuis get.activated.win
+                    string command = "irm https://get.activated.win | iex";
+                    
+                    ProcessStartInfo psi = new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -Command \"{command}\"",
+                        UseShellExecute = true,
+                        Verb = "runas" // Exécution en tant qu'admin
+                    };
+
+                    Process.Start(psi);
+                    await Task.Delay(1000);
                 }
-
-                Process.Start(new ProcessStartInfo
+                catch (Exception ex)
                 {
-                    FileName = masPath,
-                    WorkingDirectory = Path.GetDirectoryName(masPath),
-                    UseShellExecute = true,
-                    Verb = "runas"
-                });
-
-                await Task.Delay(1000);
+                    MessageBox.Show($"Erreur lors du lancement du script d'activation : {ex.Message}");
+                }
             }
         }
         
@@ -366,6 +439,57 @@ namespace Savior.UI
 
                 // 3. Winget installation
                 dlg.Append("--- Installation des applications (Winget) ---");
+                
+                // --- AJOUT AUTOMATIQUE SOFT OEM ---
+                try 
+                {
+                    if (_systemInfo.IsLaptop())
+                    {
+                        string manu = _systemInfo.GetManufacturer();
+                        string oemAppId = null;
+                        string oemAppName = null;
+
+                        switch (manu)
+                        {
+                            case "LENOVO":
+                                oemAppId = "9WZDNCRFJ4MV"; // Lenovo Vantage
+                                oemAppName = "Lenovo Vantage";
+                                break;
+                            case "ASUS":
+                                oemAppId = "9N7R5S6B0ZZH"; // MyASUS
+                                oemAppName = "MyASUS";
+                                break;
+                            case "HP":
+                                oemAppId = "9WZDNCRFHWLH"; // HP Smart
+                                oemAppName = "HP Smart";
+                                break;
+                            case "ACER":
+                                oemAppId = "9NZ1KB65PLQF"; // Acer Sense
+                                oemAppName = "Acer Sense";
+                                break;
+                            case "MSI":
+                                oemAppId = "9NVMNJGM172D"; // MSI Center
+                                oemAppName = "MSI Center";
+                                break;
+                            case "GIGABYTE":
+                                oemAppId = "Gigabyte.ControlCenter"; // GCC
+                                oemAppName = "Gigabyte Control Center";
+                                break;
+                        }
+
+                        if (oemAppId != null && !wingetApps.Contains(oemAppId))
+                        {
+                            dlg.Append($"ℹ️ PC Portable {manu} détecté : Ajout automatique de {oemAppName}");
+                            wingetApps.Add(oemAppId);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    dlg.Append($"[WARN] Erreur détection OEM : {ex.Message}");
+                }
+                // ----------------------------------
+
                 dlg.Append("Vérification / réparation de winget…");
                 await Savior.Services.WingetInstaller.EnsureWingetHealthyAsync(dlg.Append);
 
@@ -544,6 +668,50 @@ if ($package) {{
                             log($"[ERROR] AdwCleaner a échoué : {ex.Message}");
                         }
                     }
+                    else if (tool.Command.StartsWith("LOCAL_TOOL:"))
+                    {
+                        // Handle local tools from Scripts/Tools directory
+                        try
+                        {
+                            string toolFileName = tool.Command.Substring("LOCAL_TOOL:".Length);
+                            string toolPath = Services.ToolDownloader.GetLocalToolPath(toolFileName);
+                            
+                            log($"🚀 Lancement de {toolFileName}...");
+                            
+                            var psi = new ProcessStartInfo
+                            {
+                                FileName = toolPath,
+                                UseShellExecute = true,
+                                Verb = "runas" // Most security tools require admin
+                            };
+                            
+                            // Special arguments for specific tools
+                            if (toolFileName.Equals("rkill.exe", StringComparison.OrdinalIgnoreCase))
+                            {
+                                // RKill doesn't need arguments, runs and exits quickly
+                                var process = Process.Start(psi);
+                                if (process != null)
+                                {
+                                    await process.WaitForExitAsync();
+                                    log("✓ RKill terminé - Processus malveillants neutralisés");
+                                }
+                            }
+                            else
+                            {
+                                // Other tools have GUI, just launch them
+                                Process.Start(psi);
+                                log($"✓ {toolFileName} lancé - Suivez les instructions à l'écran");
+                            }
+                        }
+                        catch (FileNotFoundException ex)
+                        {
+                            log($"[ERROR] {ex.Message}");
+                        }
+                        catch (Exception ex)
+                        {
+                            log($"[ERROR] Erreur lors du lancement : {ex.Message}");
+                        }
+                    }
                     else if (isPowerShell)
                     {
                         // Execute as PowerShell script
@@ -591,10 +759,24 @@ if ($package) {{
             checkedListBoxCleanupTools.CheckOnClick = true; // Enable single click selection
             checkedListBoxCleanupTools.Items.Clear();
             
+            // Liste des outils à cocher par défaut
+            var defaultCheckedTools = new HashSet<string>
+            {
+                "Fichiers Temporaires",
+                "Cache DNS",
+                "Cache Windows Store",
+                "Windows Update Cleanup",
+                "Logs Windows Anciens",
+                "Windows Defender - Scan Complet",
+                "AdwCleaner - Suppression Adware",
+                "Autoruns - Analyse Démarrage",
+                "FRST - Diagnostic Système",
+                "Réinitialisation Navigateurs"
+            };
+            
             foreach (var tool in CleanupTools.All)
             {
-                // Pre-check basic cleanup tools
-                bool isChecked = tool.Category == CleanupCategory.Basic;
+                bool isChecked = defaultCheckedTools.Contains(tool.Name);
                 checkedListBoxCleanupTools.Items.Add(tool.Name, isChecked);
             }
         }
@@ -1003,21 +1185,14 @@ if ($service) {{
         {
             try
             {
-                string masPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scripts", "MAS_AIO.cmd");
-                string masDir = Path.GetDirectoryName(masPath)!; // Dossier du script
-                Console.WriteLine("Chemin du script MAS : " + masPath);
-
-
-                if (!File.Exists(masPath))
-                {
-                    MessageBox.Show("Le fichier MAS_AIO.cmd est introuvable. Chemin : " + masPath);
-                    return;
-                }
-
+                // Utiliser le script en ligne depuis get.activated.win
+                // Méthode 1 : irm (Invoke-RestMethod) pour Windows 8, 10, 11
+                string command = "irm https://get.activated.win | iex";
+                
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
-                    FileName = masPath, // 🆕 Chemin complet du script
-                    WorkingDirectory = masDir, // 🆕 Dossier du script
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -Command \"{command}\"",
                     UseShellExecute = true,
                     Verb = "runas" // Exécution en tant qu'admin
                 };
@@ -1026,7 +1201,26 @@ if ($service) {{
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Erreur : " + ex.Message);
+                // En cas d'erreur, proposer la méthode alternative avec curl.exe
+                try
+                {
+                    string alternativeCommand = "iex (curl.exe -s --doh-url https://1.1.1.1/dns-query https://get.activated.win | Out-String)";
+                    
+                    ProcessStartInfo psiAlt = new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -Command \"{alternativeCommand}\"",
+                        UseShellExecute = true,
+                        Verb = "runas"
+                    };
+
+                    Process.Start(psiAlt);
+                }
+                catch (Exception exAlt)
+                {
+                    MessageBox.Show($"Erreur lors du lancement du script d'activation :\n{ex.Message}\n\nErreur alternative :\n{exAlt.Message}", 
+                        "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
         
@@ -1052,6 +1246,9 @@ if ($service) {{
                 if (checkBoxLenovoVantage?.Checked == true) selectedIds.Add("9WZDNCRFJ4MV");
                 if (checkBoxHpSmart?.Checked == true) selectedIds.Add("9WZDNCRFHWLH");
                 if (checkBoxMyAsus?.Checked == true) selectedIds.Add("9N7R5S6B0ZZH");
+                if (checkBoxAcerSense?.Checked == true) selectedIds.Add("9NZ1KB65PLQF");
+                if (checkBoxMsiCenter?.Checked == true) selectedIds.Add("9NVMNJGM172D"); // MSI Center
+                if (checkBoxGigabyteControlCenter?.Checked == true) selectedIds.Add("Gigabyte.ControlCenter"); // GCC
 
                 // Exception: Kaspersky opens web link
                 if (checkBoxKaspersky?.Checked == true)
@@ -1069,9 +1266,6 @@ if ($service) {{
 
                 try
                 {
-                    // Activate Windows if needed (MAS opens independently)
-                    await ActivateWindowsIfNeededAsync();
-
                     // Winget installation & setup
                     dlg.Append("--- Installation personnalisée ---");
                     dlg.Append("Vérification / réparation de winget…");
