@@ -19,6 +19,18 @@ namespace Savior.UI
         private const int DWMSBT_TRANSIENTWINDOW = 3; // Acrylic
         private const int DWMSBT_TABBEDWINDOW = 4; // Tabbed
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MARGINS
+        {
+            public int cxLeftWidth;
+            public int cxRightWidth;
+            public int cyTopHeight;
+            public int cyBottomHeight;
+        }
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmExtendFrameIntoClientArea(IntPtr hWnd, ref MARGINS pMarInset);
+
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
@@ -39,8 +51,12 @@ namespace Savior.UI
             // 2. Tenter d'activer Mica (Windows 11 build 22621+)
             if (IsWindows11())
             {
-                int backdropType = DWMSBT_MAINWINDOW; // Mica
+                int backdropType = DWMSBT_TABBEDWINDOW; // Mica Alt
                 DwmSetWindowAttribute(form.Handle, DWMWA_SYSTEMBACKDROP_TYPE, ref backdropType, sizeof(int));
+                
+                // Étendre le cadre dans la zone client pour que Mica soit visible
+                MARGINS margins = new MARGINS { cxLeftWidth = -1, cxRightWidth = -1, cyTopHeight = -1, cyBottomHeight = -1 };
+                DwmExtendFrameIntoClientArea(form.Handle, ref margins);
                 
                 // Pour Mica, le fond doit être transparent
                 form.BackColor = Color.Black; 

@@ -1444,6 +1444,10 @@ if ($package) {{
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             AllTabs = new Savior.UI.DarkTabControl();
             TabGeneral = new System.Windows.Forms.TabPage();
+            labelCpuTemp = new System.Windows.Forms.Label();
+            labelGpuTemp = new System.Windows.Forms.Label();
+            labelWindowsActivation = new System.Windows.Forms.Label();
+            _buttonActivation = new System.Windows.Forms.Button();
             buttonMaj = new System.Windows.Forms.Button();
             groupBox11 = new System.Windows.Forms.GroupBox();
             AMDInstall = new System.Windows.Forms.Button();
@@ -1488,13 +1492,8 @@ if ($package) {{
             checkedListBoxApps = new System.Windows.Forms.CheckedListBox();
             buttonBloatWare = new System.Windows.Forms.Button();
             tabVirus = new System.Windows.Forms.TabPage();
-            checkedListBoxCleanupTools = new System.Windows.Forms.CheckedListBox();
             btnCleanup = new System.Windows.Forms.Button();
-            labelCpuTemp = new System.Windows.Forms.Label();
-            labelGpuTemp = new System.Windows.Forms.Label();
-            labelWindowsActivation = new System.Windows.Forms.Label();
-            _buttonActivation = new System.Windows.Forms.Button();
-            // Removed previously added controls (btnVirusClean, txtVirusLog) to restore original state
+            checkedListBoxCleanupTools = new System.Windows.Forms.CheckedListBox();
             AllTabs.SuspendLayout();
             TabGeneral.SuspendLayout();
             groupBox11.SuspendLayout();
@@ -1518,14 +1517,18 @@ if ($package) {{
             AllTabs.Controls.Add(tabOptimisation);
             AllTabs.Controls.Add(tabVirus);
             AllTabs.Dock = System.Windows.Forms.DockStyle.Top;
+            AllTabs.DrawMode = System.Windows.Forms.TabDrawMode.OwnerDrawFixed;
+            AllTabs.ItemSize = new System.Drawing.Size(120, 30);
             AllTabs.Location = new System.Drawing.Point(0, 0);
             AllTabs.Name = "AllTabs";
             AllTabs.SelectedIndex = 0;
             AllTabs.Size = new System.Drawing.Size(897, 608);
+            AllTabs.SizeMode = System.Windows.Forms.TabSizeMode.Fixed;
             AllTabs.TabIndex = 0;
             // 
             // TabGeneral
             // 
+            TabGeneral.BackColor = System.Drawing.Color.Transparent;
             TabGeneral.Controls.Add(labelCpuTemp);
             TabGeneral.Controls.Add(labelGpuTemp);
             TabGeneral.Controls.Add(labelWindowsActivation);
@@ -1533,13 +1536,49 @@ if ($package) {{
             TabGeneral.Controls.Add(buttonMaj);
             TabGeneral.Controls.Add(groupBox11);
             TabGeneral.Controls.Add(groupBox5);
-            TabGeneral.Location = new System.Drawing.Point(4, 28);
+            TabGeneral.Location = new System.Drawing.Point(4, 34);
             TabGeneral.Name = "TabGeneral";
             TabGeneral.Padding = new System.Windows.Forms.Padding(3);
-            TabGeneral.Size = new System.Drawing.Size(889, 576);
+            TabGeneral.Size = new System.Drawing.Size(889, 570);
             TabGeneral.TabIndex = 0;
             TabGeneral.Text = "General";
-            TabGeneral.UseVisualStyleBackColor = true;
+            // 
+            // labelCpuTemp
+            // 
+            labelCpuTemp.AccessibleName = "labelCpuTemp";
+            labelCpuTemp.Location = new System.Drawing.Point(16, 510);
+            labelCpuTemp.Name = "labelCpuTemp";
+            labelCpuTemp.Size = new System.Drawing.Size(100, 16);
+            labelCpuTemp.TabIndex = 1;
+            labelCpuTemp.Text = "CPU : -- °C";
+            // 
+            // labelGpuTemp
+            // 
+            labelGpuTemp.AccessibleName = "labelGpuTemp";
+            labelGpuTemp.Location = new System.Drawing.Point(16, 530);
+            labelGpuTemp.Name = "labelGpuTemp";
+            labelGpuTemp.Size = new System.Drawing.Size(100, 16);
+            labelGpuTemp.TabIndex = 2;
+            labelGpuTemp.Text = "GPU : -- °C";
+            // 
+            // labelWindowsActivation
+            // 
+            labelWindowsActivation.Location = new System.Drawing.Point(8, 445);
+            labelWindowsActivation.Name = "labelWindowsActivation";
+            labelWindowsActivation.Size = new System.Drawing.Size(176, 32);
+            labelWindowsActivation.TabIndex = 0;
+            labelWindowsActivation.Text = "Windows :";
+            labelWindowsActivation.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            // 
+            // _buttonActivation
+            // 
+            _buttonActivation.Location = new System.Drawing.Point(8, 412);
+            _buttonActivation.Name = "_buttonActivation";
+            _buttonActivation.Size = new System.Drawing.Size(120, 30);
+            _buttonActivation.TabIndex = 5;
+            _buttonActivation.Text = "Activer";
+            _buttonActivation.UseVisualStyleBackColor = true;
+            _buttonActivation.Click += BtnActivateWindows_Click;
             // 
             // buttonMaj
             // 
@@ -1698,10 +1737,10 @@ if ($package) {{
             TabSoftwares.Controls.Add(groupBox2);
             TabSoftwares.Controls.Add(groupBox1);
             TabSoftwares.Controls.Add(InstallSelection);
-            TabSoftwares.Location = new System.Drawing.Point(4, 28);
+            TabSoftwares.Location = new System.Drawing.Point(4, 34);
             TabSoftwares.Name = "TabSoftwares";
             TabSoftwares.Padding = new System.Windows.Forms.Padding(3);
-            TabSoftwares.Size = new System.Drawing.Size(889, 576);
+            TabSoftwares.Size = new System.Drawing.Size(889, 570);
             TabSoftwares.TabIndex = 1;
             TabSoftwares.Text = "Softwares";
             TabSoftwares.UseVisualStyleBackColor = true;
@@ -1918,10 +1957,10 @@ if ($package) {{
             // 
             tabOptimisation.Controls.Add(groupBox7);
             tabOptimisation.Controls.Add(groupBox6);
-            tabOptimisation.Location = new System.Drawing.Point(4, 28);
+            tabOptimisation.Location = new System.Drawing.Point(4, 34);
             tabOptimisation.Name = "tabOptimisation";
             tabOptimisation.Padding = new System.Windows.Forms.Padding(3);
-            tabOptimisation.Size = new System.Drawing.Size(889, 576);
+            tabOptimisation.Size = new System.Drawing.Size(889, 570);
             tabOptimisation.TabIndex = 3;
             tabOptimisation.Text = "Optimisation";
             tabOptimisation.UseVisualStyleBackColor = true;
@@ -1988,21 +2027,13 @@ if ($package) {{
             // 
             tabVirus.Controls.Add(btnCleanup);
             tabVirus.Controls.Add(checkedListBoxCleanupTools);
-            tabVirus.Location = new System.Drawing.Point(4, 28);
+            tabVirus.Location = new System.Drawing.Point(4, 34);
             tabVirus.Name = "tabVirus";
             tabVirus.Padding = new System.Windows.Forms.Padding(3);
-            tabVirus.Size = new System.Drawing.Size(889, 576);
+            tabVirus.Size = new System.Drawing.Size(889, 570);
             tabVirus.TabIndex = 4;
             tabVirus.Text = "Virus";
             tabVirus.UseVisualStyleBackColor = true;
-            // 
-            // checkedListBoxCleanupTools
-            // 
-            checkedListBoxCleanupTools.FormattingEnabled = true;
-            checkedListBoxCleanupTools.Location = new System.Drawing.Point(20, 60);
-            checkedListBoxCleanupTools.Name = "checkedListBoxCleanupTools";
-            checkedListBoxCleanupTools.Size = new System.Drawing.Size(850, 480);
-            checkedListBoxCleanupTools.TabIndex = 1;
             // 
             // btnCleanup
             // 
@@ -2014,46 +2045,17 @@ if ($package) {{
             btnCleanup.UseVisualStyleBackColor = true;
             btnCleanup.Click += BtnCleanup_Click;
             // 
-            // labelCpuTemp
+            // checkedListBoxCleanupTools
             // 
-            labelCpuTemp.AccessibleName = "labelCpuTemp";
-            labelCpuTemp.Location = new System.Drawing.Point(16, 510);
-            labelCpuTemp.Name = "labelCpuTemp";
-            labelCpuTemp.Size = new System.Drawing.Size(100, 16);
-            labelCpuTemp.TabIndex = 1;
-            labelCpuTemp.Text = "CPU : -- °C";
-            // 
-            // labelGpuTemp
-            // 
-            labelGpuTemp.AccessibleName = "labelGpuTemp";
-            labelGpuTemp.Location = new System.Drawing.Point(16, 530);
-            labelGpuTemp.Name = "labelGpuTemp";
-            labelGpuTemp.Size = new System.Drawing.Size(100, 16);
-            labelGpuTemp.TabIndex = 2;
-            labelGpuTemp.Text = "GPU : -- °C";
-            // 
-            // labelWindowsActivation
-            // 
-            labelWindowsActivation.Location = new System.Drawing.Point(130, 510);
-            labelWindowsActivation.Name = "labelWindowsActivation";
-            labelWindowsActivation.Size = new System.Drawing.Size(176, 32);
-            labelWindowsActivation.TabIndex = 0;
-            labelWindowsActivation.Text = "Windows :";
-            labelWindowsActivation.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            // 
-            // _buttonActivation
-            // 
-            _buttonActivation.Location = new System.Drawing.Point(130, 540);
-            _buttonActivation.Name = "_buttonActivation";
-            _buttonActivation.Size = new System.Drawing.Size(120, 30);
-            _buttonActivation.TabIndex = 5;
-            _buttonActivation.Text = "Activer";
-            _buttonActivation.UseVisualStyleBackColor = true;
-            _buttonActivation.Click += BtnActivateWindows_Click;
+            checkedListBoxCleanupTools.FormattingEnabled = true;
+            checkedListBoxCleanupTools.Location = new System.Drawing.Point(20, 60);
+            checkedListBoxCleanupTools.Name = "checkedListBoxCleanupTools";
+            checkedListBoxCleanupTools.Size = new System.Drawing.Size(850, 466);
+            checkedListBoxCleanupTools.TabIndex = 1;
             // 
             // MainForm
             // 
-            ClientSize = new System.Drawing.Size(897, 649);
+            ClientSize = new System.Drawing.Size(897, 608);
             Controls.Add(AllTabs);
             FormBorderStyle = System.Windows.Forms.FormBorderStyle.Fixed3D;
             Icon = ((System.Drawing.Icon)resources.GetObject("$this.Icon"));

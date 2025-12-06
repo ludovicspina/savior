@@ -12,8 +12,11 @@ namespace Savior.UI
             SetStyle(ControlStyles.UserPaint | 
                      ControlStyles.ResizeRedraw | 
                      ControlStyles.AllPaintingInWmPaint | 
-                     ControlStyles.OptimizedDoubleBuffer, true);
+                     ControlStyles.OptimizedDoubleBuffer | 
+                     ControlStyles.SupportsTransparentBackColor, true);
             
+            this.BackColor = Color.Transparent;
+
             DrawMode = TabDrawMode.OwnerDrawFixed;
             SizeMode = TabSizeMode.Fixed;
             ItemSize = new Size(120, 30); // Fixed size for better look
@@ -22,7 +25,8 @@ namespace Savior.UI
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
-            var headerColor = Color.FromArgb(30, 30, 30); // Darker background for header
+            var headerColor = Color.Transparent; // Darker background for header
+            //var headerColor = Color.FromArgb(30, 30, 30); // Darker background for header
             var activeColor = Color.FromArgb(45, 45, 48); // Matches Form background
             var textColor = Color.White;
 

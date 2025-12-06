@@ -9,9 +9,9 @@ namespace Savior.UI
     {
         private int _borderRadius = 8;
         private Color _borderColor = Color.FromArgb(20, 255, 255, 255); // Subtle border
-        private Color _hoverColor = Color.FromArgb(25, 255, 255, 255); // Lighter on hover
-        private Color _clickColor = Color.FromArgb(10, 255, 255, 255); // Darker on click
-        private Color _defaultBackColor = Color.FromArgb(15, 255, 255, 255); // Very subtle background
+        private Color _hoverColor = Color.FromArgb(8, 255, 255, 255); // Much lighter on hover (reduced to 8)
+        private Color _clickColor = Color.FromArgb(2, 255, 255, 255); // Darker on click
+        private Color _defaultBackColor = Color.FromArgb(4, 255, 255, 255); // Very subtle background
 
         public int BorderRadius
         {
