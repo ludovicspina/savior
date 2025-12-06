@@ -220,7 +220,10 @@ try { winget source reset --force; winget source update } catch {
                 if (token.IsCancellationRequested) break;
 
                 CleanLog($"--- Installing {id} ---", log);
-                var args = $"install --id {id} -e --silent --accept-package-agreements --accept-source-agreements";
+                
+                // Determine source: standard apps (with dots) -> winget, store apps (no dots) -> msstore
+                string source = id.Contains('.') ? "winget" : "msstore";
+                var args = $"install --id {id} -e --silent --accept-package-agreements --accept-source-agreements --source {source}";
                 var code = await ProcessRunner.RunHiddenAsync("winget", args, s => CleanLog(s, log), sys32);
 
                 // Check for specific exit codes
